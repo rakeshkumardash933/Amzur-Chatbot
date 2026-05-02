@@ -1,0 +1,22 @@
+# Root .gitignore
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment files (use .env.example instead)
+.env
+.env.local
+.env.*.local
+
+# Secrets and key material
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+*.secret
+secrets.*
