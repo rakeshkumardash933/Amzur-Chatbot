@@ -75,10 +75,21 @@ async def google_login(
 
     email = token_info.get("email")
     name = token_info.get("name") or "User"
+    google_id = token_info.get("sub")
     if not email:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Google token did not include email",
         )
+    if not google_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Google token did not include subject id",
+        )
 
-    return auth_service.login_or_register_google(db, email=email, name=name)
+    return auth_service.login_or_register_google(
+        db,
+        email=email,
+        name=name,
+        google_id=google_id,
+    )

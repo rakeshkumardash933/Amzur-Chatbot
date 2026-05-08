@@ -21,6 +21,13 @@ class Message(Base):
 
     # Relationships
     chat = relationship("Chat", back_populates="messages")
+    # passive_deletes=True tells SQLAlchemy to rely on the DB FK cascade
+    # rather than issuing UPDATE … SET NULL before the DELETE.
+    attachments = relationship(
+        "Attachment",
+        back_populates="message",
+        passive_deletes=True,
+    )
 
     def __repr__(self) -> str:
         return f"<Message(id={self.id}, chat_id={self.chat_id}, sender={self.sender})>"

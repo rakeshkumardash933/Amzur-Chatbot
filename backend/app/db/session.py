@@ -34,10 +34,27 @@ def init_db() -> None:
                 connection.execute(
                     text("ALTER TABLE users ADD COLUMN IF NOT EXISTS name VARCHAR(255) NOT NULL DEFAULT 'User'")
                 )
+        if "google_id" not in user_columns:
+            with engine.begin() as connection:
+                connection.execute(
+                    text("ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id VARCHAR(255)")
+                )
+        with engine.begin() as connection:
+            connection.execute(
+                text("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_google_id ON users (google_id)")
+            )
         if "password_hash" in user_columns:
             with engine.begin() as connection:
                 connection.execute(
                     text("ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL")
+                )
+
+    if "generated_images" in table_names:
+        gi_columns = {column["name"] for column in inspector.get_columns("generated_images")}
+        if "image_data" not in gi_columns:
+            with engine.begin() as connection:
+                connection.execute(
+                    text("ALTER TABLE generated_images ADD COLUMN IF NOT EXISTS image_data TEXT")
                 )
 
     if "chats" in table_names:
@@ -60,6 +77,24 @@ def init_db() -> None:
                     """
                 )
             )
+
+    # documents table — created by Base.metadata.create_all above, but ensure
+    # safe column additions if the table existed from a previous deployment.
+    if "documents" in table_names:
+        doc_columns = {column["name"] for column in inspector.get_columns("documents")}
+        for col_def in [
+            ("collection_name", "VARCHAR(255)"),
+            ("error_message", "TEXT"),
+            ("processed_at", "TIMESTAMP"),
+            ("chunk_count", "INTEGER DEFAULT 0"),
+            ("is_processed", "BOOLEAN DEFAULT FALSE NOT NULL"),
+        ]:
+            col_name, col_type = col_def
+            if col_name not in doc_columns:
+                with engine.begin() as connection:
+                    connection.execute(
+                        text(f"ALTER TABLE documents ADD COLUMN IF NOT EXISTS {col_name} {col_type}")
+                    )
 
 
 def get_db_session() -> Session:

@@ -101,7 +101,7 @@ class AuthService:
         return AuthService._token_response_for_user(user)
 
     @staticmethod
-    def login_or_register_google(db: Session, email: str, name: str) -> TokenResponse:
+    def login_or_register_google(db: Session, email: str, name: str, google_id: str) -> TokenResponse:
         """Authenticate with Google identity by upserting a user."""
         AuthService._validate_domain(email)
 
@@ -111,16 +111,24 @@ class AuthService:
             user = User(
                 name=name.strip() or email.split("@")[0],
                 email=email,
+                google_id=google_id,
                 password_hash=None,
             )
             db.add(user)
             db.commit()
             db.refresh(user)
-        elif name and user.name != name:
-            user.name = name.strip()
-            db.add(user)
-            db.commit()
-            db.refresh(user)
+        else:
+            has_changes = False
+            if name and user.name != name:
+                user.name = name.strip()
+                has_changes = True
+            if google_id and user.google_id != google_id:
+                user.google_id = google_id
+                has_changes = True
+            if has_changes:
+                db.add(user)
+                db.commit()
+                db.refresh(user)
 
         return AuthService._token_response_for_user(user)
 

@@ -1,7 +1,7 @@
 """
-Chat API routes.
+Chat API routes — includes file upload and thread/message management.
 """
-from fastapi import APIRouter, HTTPException, Depends, status
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile, Depends, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import select
@@ -11,16 +11,40 @@ from app.core.auth import get_current_user
 from app.models import User, Chat
 from app.schemas.chat import ChatRequest, ChatTitleUpdateRequest
 from app.services.chat_service import chat_service
+from app.services.attachment_service import save_uploaded_file
 
 router = APIRouter(prefix="/api", tags=["chat"])
 
 
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
 def _display_title(chat: Chat) -> str:
-    """Use chat number for legacy placeholder titles."""
     raw = (chat.title or "").strip()
     if not raw or raw.lower() == "new chat":
         return f"Chat #{chat.id}"
     return raw
+
+
+def _serialize_attachment(att) -> dict:
+    return {
+        "id": att.id,
+        "file_name": att.file_name,
+        "file_type": att.file_type,
+        "file_url": att.file_url,
+        "file_size": att.file_size,
+    }
+
+
+def _serialize_message(msg) -> dict:
+    return {
+        "id": msg.id,
+        "sender": msg.sender,
+        "content": msg.content,
+        "timestamp": msg.timestamp.isoformat(),
+        "attachments": [_serialize_attachment(a) for a in (msg.attachments or [])],
+    }
 
 
 async def _get_owned_chat(chat_id: int, user_id: int, db: Session) -> Chat:
@@ -33,6 +57,39 @@ async def _get_owned_chat(chat_id: int, user_id: int, db: Session) -> Chat:
         )
     return chat
 
+
+# ---------------------------------------------------------------------------
+# File upload
+# ---------------------------------------------------------------------------
+
+@router.post("/upload")
+async def upload_attachment(
+    file: UploadFile = File(...),
+    thread_id: int = Form(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db_session),
+) -> dict:
+    """
+    Upload a file attachment and associate it with a chat thread.
+
+    Returns attachment metadata including the server-assigned ID that must be
+    passed as attachment_ids in the subsequent POST /api/chat request.
+    """
+    # Verify the user owns this thread before accepting any bytes.
+    await _get_owned_chat(thread_id, current_user.id, db)
+    attachment = await save_uploaded_file(file, thread_id, db)
+    return {
+        "id": attachment.id,
+        "file_name": attachment.file_name,
+        "file_type": attachment.file_type,
+        "file_url": attachment.file_url,
+        "file_size": attachment.file_size,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Chat
+# ---------------------------------------------------------------------------
 
 @router.post("/chat")
 async def chat(
@@ -58,6 +115,7 @@ async def chat(
             chat_obj.id,
             db,
             current_user,
+            attachment_ids=request.attachment_ids,
         )
 
         return {
@@ -68,6 +126,11 @@ async def chat(
     except HTTPException:
         raise
     except Exception as exc:
+        if "__BUDGET_EXCEEDED__" in str(exc):
+            raise HTTPException(
+                status_code=402,
+                detail="The organisation's AI budget has been exhausted. Please contact your admin to top up the LiteLLM quota.",
+            )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to process message: {str(exc)}",
@@ -96,6 +159,7 @@ async def chat_stream(
                 request.chat_id,
                 db,
                 current_user,
+                attachment_ids=request.attachment_ids,
             ):
                 yield f"data: {token}\n\n"
             yield "data: [DONE]\n\n"
@@ -112,6 +176,9 @@ async def chat_stream(
         },
     )
 
+
+# Thread management
+# ---------------------------------------------------------------------------
 
 @router.get("/chats")
 async def get_user_chats(
@@ -153,15 +220,7 @@ async def get_chat_messages(
         return {
             "chat_id": chat.id,
             "title": _display_title(chat),
-            "messages": [
-                {
-                    "id": msg.id,
-                    "sender": msg.sender,
-                    "content": msg.content,
-                    "timestamp": msg.timestamp.isoformat(),
-                }
-                for msg in chat.messages
-            ],
+            "messages": [_serialize_message(m) for m in chat.messages],
         }
     except HTTPException:
         raise

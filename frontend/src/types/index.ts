@@ -50,3 +50,34 @@ export interface Message {
 }
 
 // Add more types as features are implemented
+
+// ---------------------------------------------------------------------------
+// Attachments
+// ---------------------------------------------------------------------------
+
+/** Attachment record returned by the server. */
+export interface Attachment {
+  id: number
+  file_name: string
+  file_type: string
+  /** Relative URL served by the backend: /uploads/<thread_id>/<file> */
+  file_url: string
+  file_size?: number
+}
+
+/**
+ * Local state for a file that is being (or has been) uploaded.
+ * Holds a temp ID so items can be tracked before the server responds.
+ */
+export interface PendingAttachment {
+  /** Locally generated key, e.g. `temp_<Date.now()>` */
+  tempId: string
+  /** Server-assigned ID — undefined while the upload is in-flight */
+  id?: number
+  file_name: string
+  file_type: string
+  /** Object-URL for image previews (created by URL.createObjectURL) */
+  preview?: string
+  isUploading: boolean
+  error?: string
+}

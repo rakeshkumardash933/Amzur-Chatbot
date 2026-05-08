@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import { LoginPage } from './pages/LoginPage'
 import { ChatWindow } from './components/chat/ChatWindow'
+import { DatabasePage } from './pages/DatabasePage'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import './index.css'
 
@@ -13,13 +14,21 @@ function App() {
         <AuthProvider>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
-            <Route 
-              path="/" 
+            <Route
+              path="/"
               element={
                 <ProtectedRoute>
                   <ChatWindow />
                 </ProtectedRoute>
-              } 
+              }
+            />
+            <Route
+              path="/database"
+              element={
+                <ProtectedRoute>
+                  <DatabasePage />
+                </ProtectedRoute>
+              }
             />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

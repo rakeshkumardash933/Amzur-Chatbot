@@ -1,7 +1,7 @@
 """
-Pydantic schemas for chat requests and responses.
+Pydantic schemas for chat requests and responses, including file attachments.
 """
-from typing import Optional
+from typing import List, Optional
 from pydantic import BaseModel, Field
 
 
@@ -10,6 +10,17 @@ class ChatRequest(BaseModel):
 
     message: str = Field(..., min_length=1, max_length=5000, description="User message")
     chat_id: Optional[int] = Field(default=None, description="Chat/Thread ID")
+    attachment_ids: List[int] = Field(
+        default_factory=list,
+        description="IDs of pre-uploaded attachments to include with this message",
+    )
+
+
+class ImageGenerationRequest(BaseModel):
+    """Request schema for image generation endpoint."""
+
+    prompt: str = Field(..., min_length=5, max_length=1000, description="Image generation prompt")
+    thread_id: int = Field(..., description="Chat/Thread ID to associate the image with")
 
 
 class ChatTitleUpdateRequest(BaseModel):

@@ -1,14 +1,20 @@
-"""
-Chat service for handling conversations through the LiteLLM proxy.
-"""
+"""Chat service for handling thread-scoped conversations through LiteLLM."""
 import json
-from typing import AsyncGenerator, Dict, List
-from datetime import datetime
+from typing import AsyncGenerator, List, Optional
+
+from langchain_core.messages import AIMessageChunk
 from openai import AsyncOpenAI
 from sqlalchemy.orm import Session
-from sqlalchemy import select
+
+from app.ai.llm import llm
+from app.ai.memory import get_thread_memory_messages
+from app.services.attachment_service import (
+    build_attachment_context,
+    build_human_message,
+    link_attachments_to_message,
+)
 from app.core.config import settings
-from app.models import Chat, Message, User
+from app.models import Message, User
 
 
 def _is_placeholder_key(value: str | None) -> bool:
@@ -20,7 +26,7 @@ def _is_placeholder_key(value: str | None) -> bool:
 class ChatService:
     """
     Service for managing chat conversations with LiteLLM proxy.
-    Maintains conversation history in memory and persists to database.
+    Conversation memory is reconstructed from thread history stored in database.
     """
 
     def __init__(self):
@@ -32,8 +38,6 @@ class ChatService:
                 api_key=self.api_key,
                 base_url=settings.LITELLM_PROXY_URL,
             )
-        # In-memory conversation storage: {chat_id: [messages as OpenAI dicts]}
-        self.conversations: Dict[str, List[Dict[str, str]]] = {}
 
     def _resolve_litellm_key(self) -> str | None:
         """Prefer LITELLM_VIRTUAL_KEY and fallback to LITELLM_API_KEY."""
@@ -100,139 +104,131 @@ class ChatService:
             words = cleaned.split()
             return " ".join(words[:6])[:60] or "New Chat"
 
-    def get_conversation_history(self, chat_id: int | str) -> List[Dict[str, str]]:
-        """Get conversation history from memory cache."""
-        return self.conversations.get(str(chat_id), [])
+    def save_message(self, chat_id: int, role: str, content: str, db: Session) -> None:
+        """Persist one message in PostgreSQL and return the saved object."""
+        message = Message(chat_id=chat_id, sender=role, content=content)
+        db.add(message)
+        db.commit()
+        db.refresh(message)
+        return message
 
-    def load_chat_from_db(self, db: Session, chat_id: int) -> List[Dict[str, str]]:
-        """Load chat history from database."""
-        stmt = select(Message).where(Message.chat_id == chat_id)
-        messages = db.execute(stmt).scalars().all()
-        
-        history = []
-        for msg in messages:
-            history.append({
-                "role": msg.sender,
-                "content": msg.content
-            })
-        
-        # Cache in memory
-        self.conversations[str(chat_id)] = history
-        return history
-
-    def add_message_to_history(
-        self, chat_id: int | str, role: str, content: str, db: Session | None = None
-    ) -> None:
-        """Add a message to conversation history and optionally persist to database."""
-        chat_key = str(chat_id)
-        if chat_key not in self.conversations:
-            self.conversations[chat_key] = []
-        self.conversations[chat_key].append({"role": role, "content": content})
-        
-        # Save to database if session provided
-        if db and isinstance(chat_id, int):
-            message = Message(
-                chat_id=chat_id,
-                sender=role,
-                content=content
-            )
-            db.add(message)
-            db.commit()
+    @staticmethod
+    def _normalize_chunk_content(content: str | List[dict] | None) -> str:
+        """Normalize model content payloads to plain text."""
+        if content is None:
+            return ""
+        if isinstance(content, str):
+            return content
+        if isinstance(content, list):
+            return "".join(str(item.get("text", "")) for item in content if isinstance(item, dict))
+        return str(content)
 
     async def chat(
-        self, user_message: str, chat_id: int, db: Session, user: User
+        self, user_message: str, chat_id: int, db: Session, user: User,
+        attachment_ids: Optional[List[int]] = None,
     ) -> str:
-        """
-        Process a user message and return the AI response.
-        
-        Args:
-            user_message: The user's input message
-            chat_id: Chat ID for database persistence
-            db: Database session
-            user: Authenticated user object
-            
-        Returns:
-            The AI-generated response
-        """
-        # Load chat history
-        history = self.load_chat_from_db(db, chat_id)
-        
+        """Process a user message (with optional file attachments) and return the AI response."""
+        # Build DB-backed thread memory before saving current user prompt.
+        memory_messages = get_thread_memory_messages(db, chat_id, limit=5)
+
+        # Extract text context and image data from any uploaded attachments.
+        attachment_context, image_parts = build_attachment_context(
+            attachment_ids or [], db
+        )
+
         if _is_placeholder_key(self.api_key) or self.client is None:
-            self.add_message_to_history(chat_id, "user", user_message, db)
+            user_msg_obj = self.save_message(chat_id, "user", user_message, db)
+            link_attachments_to_message(attachment_ids or [], user_msg_obj.id, db)
             ai_response = self._local_fallback_response(user_message)
-            self.add_message_to_history(chat_id, "assistant", ai_response, db)
+            self.save_message(chat_id, "assistant", ai_response, db)
             return ai_response
 
         try:
-            # Add user message to history
-            self.add_message_to_history(chat_id, "user", user_message, db)
-            history = self.get_conversation_history(chat_id)
+            user_msg_obj = self.save_message(chat_id, "user", user_message, db)
+            link_attachments_to_message(attachment_ids or [], user_msg_obj.id, db)
 
-            response = await self.client.chat.completions.create(
-                model=settings.LLM_MODEL,
-                messages=history,
-                temperature=0.7,
-                user=user.email,
-                extra_body={"metadata": self._build_user_metadata(user.email)},
-                extra_headers={
-                    "x-litellm-spend-logs-metadata": self._build_spend_logs_metadata(user.id)
-                },
+            # Build full prompt text, prepending attachment context when present.
+            full_text = (
+                "The user has shared files. Use their extracted content/metadata to answer. "
+                "If the files contain tables, summarize key rows/columns and notable values. "
+                "If they contain formulas, explain the notation, variables, and meaning step by step. "
+                "If they contain code, explain what the code does, important functions, bugs, and improvements when relevant. "
+                "When file text is unavailable, explicitly say what was unavailable and why.\n\n"
+                f"Files context:\n\n{attachment_context}\n\n"
+                f"---\nUser message: {user_message}"
+                if attachment_context
+                else user_message
             )
+            current_message = build_human_message(full_text, image_parts)
+            prompt_messages = [*memory_messages, current_message]
 
-            ai_response = response.choices[0].message.content or ""
-            self.add_message_to_history(chat_id, "assistant", ai_response, db)
+            response = await llm.ainvoke(prompt_messages)
+            ai_response = self._normalize_chunk_content(response.content)
+
+            self.save_message(chat_id, "assistant", ai_response, db)
 
             return ai_response
 
         except Exception as e:
-            raise Exception(f"Error communicating with LiteLLM API: {str(e)}")
+            err_str = str(e)
+            if "budget_exceeded" in err_str or "Budget has been exceeded" in err_str:
+                raise Exception("__BUDGET_EXCEEDED__")
+            raise Exception(f"Error communicating with LiteLLM API: {err_str}")
 
     async def chat_stream(
-        self, user_message: str, chat_id: int, db: Session, user: User
+        self, user_message: str, chat_id: int, db: Session, user: User,
+        attachment_ids: Optional[List[int]] = None,
     ) -> AsyncGenerator[str, None]:
         """Stream an AI response token-by-token for real-time UI updates."""
-        # Load chat history
-        history = self.load_chat_from_db(db, chat_id)
-        
+        # Build DB-backed thread memory before saving current user prompt.
+        memory_messages = get_thread_memory_messages(db, chat_id, limit=5)
+
+        attachment_context, image_parts = build_attachment_context(
+            attachment_ids or [], db
+        )
+
         if _is_placeholder_key(self.api_key) or self.client is None:
-            self.add_message_to_history(chat_id, "user", user_message, db)
+            user_msg_obj = self.save_message(chat_id, "user", user_message, db)
+            link_attachments_to_message(attachment_ids or [], user_msg_obj.id, db)
             fallback = self._local_fallback_response(user_message)
-            self.add_message_to_history(chat_id, "assistant", fallback, db)
+            self.save_message(chat_id, "assistant", fallback, db)
             yield fallback
             return
 
-        self.add_message_to_history(chat_id, "user", user_message, db)
-        history = self.get_conversation_history(chat_id)
+        user_msg_obj = self.save_message(chat_id, "user", user_message, db)
+        link_attachments_to_message(attachment_ids or [], user_msg_obj.id, db)
+
+        full_text = (
+            "The user has shared files. Use their extracted content/metadata to answer. "
+            "If the files contain tables, summarize key rows/columns and notable values. "
+            "If they contain formulas, explain the notation, variables, and meaning step by step. "
+            "If they contain code, explain what the code does, important functions, bugs, and improvements when relevant. "
+            "When file text is unavailable, explicitly say what was unavailable and why.\n\n"
+            f"Files context:\n\n{attachment_context}\n\n"
+            f"---\nUser message: {user_message}"
+            if attachment_context
+            else user_message
+        )
+        current_message = build_human_message(full_text, image_parts)
+        prompt_messages = [*memory_messages, current_message]
         assembled = ""
 
         try:
-            stream = await self.client.chat.completions.create(
-                model=settings.LLM_MODEL,
-                messages=history,
-                temperature=0.7,
-                stream=True,
-                user=user.email,
-                extra_body={"metadata": self._build_user_metadata(user.email)},
-                extra_headers={
-                    "x-litellm-spend-logs-metadata": self._build_spend_logs_metadata(user.id)
-                },
-            )
-
-            async for chunk in stream:
-                delta = chunk.choices[0].delta.content if chunk.choices else None
+            async for chunk in llm.astream(prompt_messages):
+                if not isinstance(chunk, AIMessageChunk):
+                    continue
+                delta = self._normalize_chunk_content(chunk.content)
                 if delta:
                     assembled += delta
                     yield delta
 
-            self.add_message_to_history(chat_id, "assistant", assembled, db)
+            self.save_message(chat_id, "assistant", assembled, db)
         except Exception as e:
             raise Exception(f"Error streaming from LiteLLM API: {str(e)}")
 
     def clear_conversation(self, chat_id: int | str) -> None:
-        """Clear the conversation history from memory cache."""
-        chat_key = str(chat_id)
-        if chat_key in self.conversations:
-            del self.conversations[chat_key]
+        """No-op for compatibility. Memory is database-backed by thread."""
+        return None
 
 
 # Global instance

@@ -41,11 +41,19 @@ class Settings(BaseSettings):
     LITELLM_EMBEDDING_MODEL: str = "text-embedding-3-large"
    
     # Google Gemini API
-    GOOGLE_GEMINI_API_KEY: str
+    GOOGLE_GEMINI_API_KEY: Optional[str] = None
     GEMINI_MODEL: str = "gemini-pro"
+    GEMINI_IMAGE_MODEL: str = "gemini-2.5-flash-image"
+
+    # Image generation via LiteLLM proxy
+    IMAGE_GEN_MODEL: str = "gemini/gemini-2.5-flash"
     
     # ChromaDB
     CHROMA_PERSIST_DIR: str = "./chroma_data"
+
+    # File uploads
+    UPLOAD_DIR: str = "./uploads"
+    MAX_FILE_SIZE_MB: int = 20
     
     # CORS
     CORS_ORIGINS: list[str] = [

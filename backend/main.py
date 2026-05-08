@@ -1,11 +1,14 @@
 """
 FastAPI application entry point.
 """
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from app.core.config import settings
 from app.core.logging import setup_logging
-from app.api import chat, auth
+from app.api import chat, auth, image, document, database
 from app.db.session import init_db
 
 # Setup logging
@@ -33,6 +36,12 @@ async def startup_event():
     """Initialize database tables on application startup."""
     init_db()
 
+    # Ensure the upload directory exists and serve its contents as static files
+    # so browsers can load /uploads/<thread_id>/<filename> URLs.
+    upload_dir = Path(__file__).parent / "uploads"
+    upload_dir.mkdir(exist_ok=True)
+    app.mount("/uploads", StaticFiles(directory=str(upload_dir)), name="uploads")
+
 
 # Health check endpoint
 @app.get("/health")
@@ -44,6 +53,9 @@ async def health_check():
 # Include routers
 app.include_router(auth.router)
 app.include_router(chat.router)
+app.include_router(image.router)
+app.include_router(document.router)
+app.include_router(database.router)
 
 
 if __name__ == "__main__":

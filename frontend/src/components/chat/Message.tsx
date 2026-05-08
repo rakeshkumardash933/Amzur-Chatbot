@@ -1,46 +1,73 @@
 /**
- * Component to display a single chat message with typing effect.
+ * Message — renders a single chat bubble with Markdown, syntax-highlighted
+ * code blocks, KaTeX formulas, and file attachment cards.
  */
-import { useEffect, useState } from 'react'
+import ReactMarkdown from 'react-markdown'
+import remarkMath from 'remark-math'
+import rehypeKatex from 'rehype-katex'
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
+import 'katex/dist/katex.min.css'
+import type { Attachment } from '@/types'
+import { AttachmentDisplay } from '../attachments/AttachmentDisplay'
 
 interface MessageProps {
   role: 'user' | 'assistant'
   content: string
+  attachments?: Attachment[]
 }
 
-export const Message = ({ role, content }: MessageProps) => {
-  const [displayedContent, setDisplayedContent] = useState('')
-  const [isTyping, setIsTyping] = useState(false)
-
-  useEffect(() => {
-    if (role === 'assistant') {
-      // Typing effect for assistant messages
-      setIsTyping(true)
-      let index = 0
-      const interval = setInterval(() => {
-        if (index < content.length) {
-          setDisplayedContent(content.substring(0, index + 1))
-          index++
-        } else {
-          setIsTyping(false)
-          clearInterval(interval)
-        }
-      }, 20)
-
-      return () => clearInterval(interval)
-    } else {
-      setIsTyping(false)
-      setDisplayedContent(content)
-    }
-  }, [content, role])
-
+export const Message = ({ role, content, attachments = [] }: MessageProps) => {
   const isUser = role === 'user'
 
   return (
     <div className={isUser ? 'chat-message-row user' : 'chat-message-row bot'}>
       <div className={isUser ? 'chat-message user' : 'chat-message bot'}>
-        <p>{displayedContent}</p>
-        {isTyping && <span className="chat-typing-cursor">▊</span>}
+
+        {/* Attachments displayed above the text bubble */}
+        {attachments.length > 0 && (
+          <div className="flex flex-col gap-2 mb-2">
+            {attachments.map((att) => (
+              <AttachmentDisplay key={att.id} attachment={att} />
+            ))}
+          </div>
+        )}
+
+        {/* Markdown content with math + syntax highlighting */}
+        {content && (
+          <div className="prose prose-invert prose-sm max-w-none break-words">
+            <ReactMarkdown
+              remarkPlugins={[remarkMath]}
+              rehypePlugins={[rehypeKatex]}
+              components={{
+                // Syntax-highlighted code blocks
+                code({ className, children, ...props }) {
+                  const match = /language-(\w+)/.exec(className || '')
+                  const isBlock = !!match
+                  return isBlock ? (
+                    <SyntaxHighlighter
+                      style={vscDarkPlus as Record<string, React.CSSProperties>}
+                      language={match[1]}
+                      PreTag="div"
+                      customStyle={{ borderRadius: '0.5rem', margin: '0.5rem 0', fontSize: '0.8rem' }}
+                    >
+                      {String(children).replace(/\n$/, '')}
+                    </SyntaxHighlighter>
+                  ) : (
+                    <code
+                      className={`bg-slate-700 text-blue-300 px-1 py-0.5 rounded text-sm font-mono ${className ?? ''}`}
+                      {...props}
+                    >
+                      {children}
+                    </code>
+                  )
+                },
+              }}
+            >
+              {content}
+            </ReactMarkdown>
+          </div>
+        )}
       </div>
     </div>
   )

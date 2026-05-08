@@ -2,6 +2,7 @@
  * Chat sidebar component showing chat history and user options.
  */
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 
 interface ChatItem {
@@ -36,6 +37,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
   const [actionChatId, setActionChatId] = useState<number | null>(null)
 
   const { user, token } = useAuth()
+  const navigate = useNavigate()
   const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
 
   const loadChats = async () => {
@@ -280,6 +282,12 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
         <div className="border-t border-slate-700 p-4 space-y-2">
           <div className="text-sm text-slate-400 truncate">{user?.name || user?.email}</div>
           <div className="text-xs text-slate-500 truncate">{user?.email}</div>
+          <button
+            onClick={() => navigate('/database')}
+            className="w-full px-4 py-2 bg-slate-700 hover:bg-blue-700 text-slate-300 hover:text-white rounded-lg font-medium text-sm transition duration-200 flex items-center justify-center gap-2"
+          >
+            🗄 DB Chat
+          </button>
           <button
             onClick={onLogout}
             className="w-full px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white rounded-lg font-medium text-sm transition duration-200"
