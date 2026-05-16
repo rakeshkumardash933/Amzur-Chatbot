@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_ID: Optional[str] = None
     GOOGLE_CLIENT_SECRET: Optional[str] = None
     GOOGLE_REDIRECT_URI: Optional[str] = None
+    GOOGLE_SERVICE_ACCOUNT_JSON: Optional[str] = None
     
     # LiteLLM Proxy
     LITELLM_PROXY_URL: str = "https://litellm.amzur.com/v1"

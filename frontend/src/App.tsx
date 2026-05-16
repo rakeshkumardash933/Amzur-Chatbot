@@ -4,6 +4,9 @@ import { AuthProvider } from './contexts/AuthContext'
 import { LoginPage } from './pages/LoginPage'
 import { ChatWindow } from './components/chat/ChatWindow'
 import { DatabasePage } from './pages/DatabasePage'
+import { SheetsPage } from './pages/SheetsPage'
+import ResearchPage from './pages/ResearchPage'
+import TicTacToePage from './pages/TicTacToePage'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import './index.css'
 
@@ -27,6 +30,30 @@ function App() {
               element={
                 <ProtectedRoute>
                   <DatabasePage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/sheets"
+              element={
+                <ProtectedRoute>
+                  <SheetsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/research"
+              element={
+                <ProtectedRoute>
+                  <ResearchPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/game"
+              element={
+                <ProtectedRoute>
+                  <TicTacToePage />
                 </ProtectedRoute>
               }
             />

@@ -334,3 +334,110 @@ body {
 		min-width: 78px;
 	}
 }
+
+.ttt-result-overlay {
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	backdrop-filter: blur(1px);
+	animation: tttOverlayIn 220ms ease-out;
+	z-index: 10;
+}
+
+.ttt-result-overlay.win {
+	background: radial-gradient(circle at 50% 40%, rgba(16, 185, 129, 0.16), rgba(16, 185, 129, 0.04));
+}
+
+.ttt-result-overlay.lose {
+	background: radial-gradient(circle at 50% 40%, rgba(244, 63, 94, 0.16), rgba(244, 63, 94, 0.05));
+}
+
+.ttt-result-overlay.draw {
+	background: radial-gradient(circle at 50% 40%, rgba(148, 163, 184, 0.18), rgba(148, 163, 184, 0.05));
+}
+
+.ttt-result-badge {
+	font-size: 28px;
+	font-weight: 800;
+	letter-spacing: 0.02em;
+	padding: 10px 18px;
+	border-radius: 14px;
+	background: rgba(15, 23, 42, 0.84);
+	color: #f8fafc;
+	border: 1px solid rgba(148, 163, 184, 0.4);
+	box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+	animation: tttBadgePop 420ms cubic-bezier(0.22, 1, 0.36, 1);
+	text-transform: uppercase;
+	line-height: 1;
+	z-index: 2;
+}
+
+.ttt-confetti-wrap {
+	position: absolute;
+	inset: 0;
+	overflow: hidden;
+}
+
+.ttt-confetti {
+	position: absolute;
+	top: -8%;
+	width: 8px;
+	height: 12px;
+	border-radius: 2px;
+	background: linear-gradient(180deg, #f59e0b, #ef4444);
+	animation: tttFall 1.2s ease-in forwards;
+	opacity: 0.9;
+}
+
+.ttt-result-overlay.win .ttt-confetti:nth-child(3n) {
+	background: linear-gradient(180deg, #34d399, #22c55e);
+}
+
+.ttt-result-overlay.win .ttt-confetti:nth-child(3n + 1) {
+	background: linear-gradient(180deg, #60a5fa, #2563eb);
+}
+
+.ttt-result-overlay.lose .ttt-confetti {
+	background: linear-gradient(180deg, #fb7185, #e11d48);
+}
+
+.ttt-result-overlay.draw .ttt-confetti {
+	background: linear-gradient(180deg, #cbd5e1, #94a3b8);
+}
+
+@keyframes tttOverlayIn {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
+}
+
+@keyframes tttBadgePop {
+	0% {
+		transform: scale(0.85);
+		opacity: 0;
+	}
+	100% {
+		transform: scale(1);
+		opacity: 1;
+	}
+}
+
+@keyframes tttFall {
+	0% {
+		transform: translateY(0) rotate(0deg);
+		opacity: 0;
+	}
+	15% {
+		opacity: 1;
+	}
+	100% {
+		transform: translateY(120%) rotate(540deg);
+		opacity: 0;
+	}
+}

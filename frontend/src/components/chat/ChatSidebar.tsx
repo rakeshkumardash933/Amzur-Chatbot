@@ -289,6 +289,24 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
             🗄 DB Chat
           </button>
           <button
+            onClick={() => navigate('/sheets')}
+            className="w-full px-4 py-2 bg-slate-700 hover:bg-emerald-700 text-slate-300 hover:text-white rounded-lg font-medium text-sm transition duration-200 flex items-center justify-center gap-2"
+          >
+            📊 Sheet Agent
+          </button>
+          <button
+            onClick={() => navigate('/research')}
+            className="w-full px-4 py-2 bg-slate-700 hover:bg-violet-700 text-slate-300 hover:text-white rounded-lg font-medium text-sm transition duration-200 flex items-center justify-center gap-2"
+          >
+            🔬 Research Agent
+          </button>
+          <button
+            onClick={() => navigate('/game')}
+            className="w-full px-4 py-2 bg-slate-700 hover:bg-indigo-700 text-slate-300 hover:text-white rounded-lg font-medium text-sm transition duration-200 flex items-center justify-center gap-2"
+          >
+            🎮 AI Tic Tac Toe
+          </button>
+          <button
             onClick={onLogout}
             className="w-full px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white rounded-lg font-medium text-sm transition duration-200"
           >
