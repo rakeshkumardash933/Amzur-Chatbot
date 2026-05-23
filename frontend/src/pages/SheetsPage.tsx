@@ -49,6 +49,12 @@ export const SheetsPage = () => {
               AI Game
             </button>
             <button
+              onClick={() => navigate('/tickets')}
+              className="rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700"
+            >
+              Support Tickets
+            </button>
+            <button
               onClick={() => {
                 logout()
                 navigate('/login')

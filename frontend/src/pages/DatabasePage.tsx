@@ -97,6 +97,12 @@ export const DatabasePage = () => {
             🎮 AI Tic Tac Toe
           </button>
           <button
+            onClick={() => navigate('/tickets')}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-300 hover:bg-slate-700 transition-colors"
+          >
+            🎫 Support Tickets
+          </button>
+          <button
             onClick={() => { setShowSchema((v) => !v); setShowHistory(false) }}
             className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${showSchema ? 'bg-blue-700 text-white' : 'text-slate-300 hover:bg-slate-700'}`}
           >

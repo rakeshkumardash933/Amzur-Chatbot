@@ -46,6 +46,12 @@ class Settings(BaseSettings):
     GEMINI_MODEL: str = "gemini-pro"
     GEMINI_IMAGE_MODEL: str = "gemini-2.5-flash-image"
 
+    # Support ticket automation
+    N8N_TICKET_WEBHOOK_URL: Optional[str] = None
+    N8N_WEBHOOK_URL: Optional[str] = None
+    N8N_WEBHOOK_BEARER_TOKEN: Optional[str] = None
+    N8N_WEBHOOK_HEADERS_JSON: Optional[str] = None
+
     # Image generation via LiteLLM proxy
     IMAGE_GEN_MODEL: str = "gemini/gemini-2.5-flash"
     
@@ -74,6 +80,32 @@ class Settings(BaseSettings):
         if not key:
             raise ValueError("JWT secret is not configured. Set JWT_SECRET in backend/.env")
         return key
+
+    @property
+    def ticket_webhook_url(self) -> Optional[str]:
+        """Resolve the support ticket webhook URL from either supported env var name."""
+        return self.N8N_TICKET_WEBHOOK_URL or self.N8N_WEBHOOK_URL
+
+    @property
+    def ticket_webhook_headers(self) -> dict[str, str]:
+        """Resolve optional headers for the n8n webhook request."""
+        headers: dict[str, str] = {}
+
+        if self.N8N_WEBHOOK_BEARER_TOKEN:
+            headers["Authorization"] = f"Bearer {self.N8N_WEBHOOK_BEARER_TOKEN}"
+
+        raw_headers = self.N8N_WEBHOOK_HEADERS_JSON
+        if raw_headers:
+            import json
+
+            try:
+                parsed = json.loads(raw_headers)
+                if isinstance(parsed, dict):
+                    headers.update({str(key): str(value) for key, value in parsed.items()})
+            except Exception:
+                raise ValueError("N8N_WEBHOOK_HEADERS_JSON must contain valid JSON object data")
+
+        return headers
 
 
 settings = Settings()

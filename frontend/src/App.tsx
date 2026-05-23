@@ -7,6 +7,7 @@ import { DatabasePage } from './pages/DatabasePage'
 import { SheetsPage } from './pages/SheetsPage'
 import ResearchPage from './pages/ResearchPage'
 import TicTacToePage from './pages/TicTacToePage'
+import { SupportTicketPage } from './pages/SupportTicketPage'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import './index.css'
 
@@ -54,6 +55,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <TicTacToePage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/tickets"
+              element={
+                <ProtectedRoute>
+                  <SupportTicketPage />
                 </ProtectedRoute>
               }
             />

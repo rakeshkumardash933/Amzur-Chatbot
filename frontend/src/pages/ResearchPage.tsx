@@ -235,6 +235,12 @@ const ResearchPage: React.FC = () => {
             <span>🎮</span> AI Game
           </button>
           <button
+            onClick={() => navigate('/tickets')}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+          >
+            <span>🎫</span> Support Tickets
+          </button>
+          <button
             onClick={handleLogout}
             className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-red-400 hover:text-red-300 hover:bg-red-900/20 transition-colors"
           >

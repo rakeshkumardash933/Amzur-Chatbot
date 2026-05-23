@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from app.core.config import settings
 from app.core.logging import setup_logging
-from app.api import chat, auth, image, document, database, sheet, research, game
+from app.api import chat, auth, image, document, database, sheet, research, game, ticket
 from app.db.session import init_db
 
 # Setup logging
@@ -59,6 +59,7 @@ app.include_router(database.router)
 app.include_router(sheet.router)
 app.include_router(research.router)
 app.include_router(game.router)
+app.include_router(ticket.router)
 
 
 if __name__ == "__main__":
